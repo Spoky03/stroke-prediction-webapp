@@ -1,4 +1,5 @@
-import { PredictionForm } from "./components/PredictionForm";
+import { PredictionWrapper } from "./components/PredictionWrapper";
+
 function App() {
   return (
     <>
@@ -18,13 +19,10 @@ function App() {
           This app helps you predict the likelihood of a stroke based on various
           health metrics.
         </p>
-        <p className="mt-4">Please fill out the form to get your prediction.</p>
-        <div className="w-full max-w-xl mt-4">
-          <PredictionForm />
-        </div>
+        <PredictionWrapper />
         <p className="mt-4">
           For any issues, please check our{" "}
-          <a href="#" className="text-blue-500">
+          <a href="https://github.com/Spoky03/stroke-prediction-webapp" className="text-blue-500">
             GitHub repository
           </a>
           .

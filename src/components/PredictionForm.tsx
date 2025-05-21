@@ -138,7 +138,7 @@ const formSchema = z.object({
   ),
 });
 
-export function PredictionForm() {
+export function PredictionForm({ setResult, setResultData }: { setResult: (result: boolean) => void; setResultData: (resultData: unknown) => void }) {
   // 1. Define your form.
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -171,6 +171,13 @@ export function PredictionForm() {
   // 2. Define a submit handler.
   function onSubmit(values: z.infer<typeof formSchema>) {
     console.log(values);
+    setResult(true);
+    // scroll to the top
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    // mimic an awaiting api call
+    setTimeout(() => {
+      setResultData(values);
+    }, 4000);
   }
 
   const symptomOptions = [
