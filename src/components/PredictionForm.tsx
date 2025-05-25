@@ -24,6 +24,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import type { PredictRequest } from "@/interfaces/index.ts";
+import { postRequest } from "@/lib/requests";
+
 /* 
   'Patient ID',
   'Patient Name',
@@ -59,145 +62,123 @@ import {
 
   'Diagnosis'
 */
+// name is not required 
 const formSchema = z.object({
-  name: z.string().min(2, {
-    message: "Name must be at least 2 characters.",
-  }),
+  name: z.string().optional(),
   age: z
     .number()
     .min(0, {
       message: "Age must be a positive number.",
     })
-    .max(120, {
-      message: "Age must be less than 120.",
+    .max(110, {
+      message: "Age must be less than 110.",
     }),
-  gender: z.enum(["Male", "Female", "Other"]),
+  gender: z.enum(["Male", "Female"]),
   hypertension: z.union([z.literal(1), z.literal(0)]),
-  heartDisease: z.union([z.literal(1), z.literal(0)]),
-  maritalStatus: z.enum(["Married", "Single", "Divorced"]),
-  workType: z.enum([
-    "Private",
-    "Self-employed",
-    "Government Job",
-    "Never Worked",
-  ]),
+  heartdisease: z.union([z.literal(1), z.literal(0)]),
+  everMarried: z.union([z.literal(1), z.literal(0)]),
+  workType: z.enum(["Private", "Self-employed", "Government Job", "Children"]),
   residenceType: z.enum(["Urban", "Rural"]),
   averageGlucoseLevel: z
     .number()
-    .min(0, {
+    .min(40, {
       message: "Average Glucose Level must be a positive number.",
     })
-    .max(300, {
-      message: "Average Glucose Level must be less than 300.",
+    .max(280, {
+      message: "Average Glucose Level must be less than 280.",
     }),
   bodyMassIndex: z
     .number()
-    .min(10, {
-      message: "Body Mass Index must be atleast 10.",
+    .min(14, {
+      message: "Body Mass Index must be atleast 14.",
     })
     .max(50, {
       message: "Body Mass Index must be less than 50.",
     }),
-  smokingStatus: z.enum(["Formerly Smoked", "Non-smoker", "Currently Smokes"]),
-  alcoholIntake: z.enum([
-    "Never",
-    "Rarely",
-    "Social Drinker",
-    "Frequent Drinker",
+  smokingStatus: z.enum([
+    "Formerly smoked",
+    "Never smoked",
+    "Smokes",
+    "Unknown",
   ]),
-  physicalActivity: z.enum(["Low", "Moderate", "High"]),
-  strokeHistory: z.union([z.literal(1), z.literal(0)]),
-  familyHistoryOfStroke: z.union([z.literal(1), z.literal(0)]),
-  dietaryHabits: z.enum([
-    "Gluten-free",
-    "Vegetarian",
-    "Vegan",
-    "Non-vegetarian",
-    "Paleo",
-    "Keto",
-    "Pescatarian",
-  ]),
-  stressLevels: z.number().min(0).max(10),
-  bloodPressureLevels_systolic: z.number().min(0).max(200),
-  bloodPressureLevels_diastolic: z.number().min(0).max(120),
-  cholesterolLevels_HDL: z.number().min(0).max(100),
-  cholesterolLevels_LDL: z.number().min(0).max(200),
-  symptoms: z.array(
-    z.enum([
-      "Blurred Vision",
-      "Confusion",
-      "Difficulty Speaking",
-      "Dizziness",
-      "Headache",
-      "Loss of Balance",
-      "Numbness",
-      "Seizures",
-      "Severe Fatigue",
-      "Weakness",
-    ])
-  ),
 });
 
-export function PredictionForm({ setResult, setResultData }: { setResult: (result: boolean) => void; setResultData: (resultData: unknown) => void }) {
+export function PredictionForm({
+  setResult,
+  setResultData,
+}: {
+  setResult: (result: boolean) => void;
+  setResultData: (result: [string, boolean]) => void;
+}) {
   // 1. Define your form.
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: "",
-      age: 0,
+      age: 20,
       gender: "Male",
       hypertension: 0,
-      heartDisease: 0,
-      maritalStatus: "Single",
+      heartdisease: 0,
+      everMarried: 0,
       workType: "Private",
       residenceType: "Urban",
-      averageGlucoseLevel: 0,
-      bodyMassIndex: 10,
-      smokingStatus: "Non-smoker",
-      alcoholIntake: "Never",
-      physicalActivity: "Low",
-      strokeHistory: 0,
-      familyHistoryOfStroke: 0,
-      dietaryHabits: "Non-vegetarian",
-      stressLevels: 0,
-      bloodPressureLevels_systolic: 0,
-      bloodPressureLevels_diastolic: 0,
-      cholesterolLevels_HDL: 0,
-      cholesterolLevels_LDL: 0,
-      symptoms: [],
+      averageGlucoseLevel: 80,
+      bodyMassIndex: 24,
+      smokingStatus: "Never smoked",
     },
   });
 
   // 2. Define a submit handler.
   function onSubmit(values: z.infer<typeof formSchema>) {
-    console.log(values);
     setResult(true);
     // scroll to the top
     window.scrollTo({ top: 0, behavior: "smooth" });
-    // mimic an awaiting api call
-    setTimeout(() => {
-      setResultData(values);
-    }, 4000);
+    // modify values to match the PredictRequest interface
+    // Map form values to PredictRequest interface
+    // Map workType to match PredictRequest expected values
+    const workTypeMap: Record<
+      string,
+      "Private" | "Self-employed" | "Govt_job" | "children"
+    > = {
+      Private: "Private",
+      "Self-employed": "Self-employed",
+      "Government Job": "Govt_job",
+      Children: "children",
+    };
+
+    const modifiedValues: PredictRequest = {
+      name: values.name || "Unknown", // Default to "Unknown" if name is not provided
+      age: values.age,
+      avg_glucose_level: values.averageGlucoseLevel,
+      bmi: values.bodyMassIndex,
+      hypertension: values.hypertension === 1 ? "Yes" : "No",
+      heartdisease: values.heartdisease === 1 ? "Yes" : "No",
+      gender: values.gender,
+      ever_married: values.everMarried === 1 ? "Yes" : "No",
+      work_type: workTypeMap[values.workType],
+      Residence_type: values.residenceType,
+      smoking_status: values.smokingStatus,
+    };
+    // Make the API request
+    postRequest("/predict", modifiedValues)
+      .then((response) => {
+        setResultData([response.data.probability, true]);
+      })
+      .catch((error) => {
+        console.error("API Error:", error);
+        setResultData([
+          `${
+            error.status || ""
+          } An error occurred while processing your request.`,
+          false,
+        ]);
+      });
   }
-
-  const symptomOptions = [
-    "Blurred Vision",
-    "Confusion",
-    "Difficulty Speaking",
-    "Dizziness",
-    "Headache",
-    "Loss of Balance",
-    "Numbness",
-    "Seizures",
-    "Severe Fatigue",
-    "Weakness",
-  ] as const;
-
   return (
     <Form {...form}>
       <form
         onSubmit={form.handleSubmit(onSubmit)}
-        className="space-y-8 max-w-3xl mx-auto p-6 bg-white rounded-lg shadow"
+        className="space-y-12 max-w-3xl mx-auto p-6 my-6 bg-white rounded-lg shadow"
       >
         {/* Name */}
         <FormField
@@ -209,7 +190,7 @@ export function PredictionForm({ setResult, setResultData }: { setResult: (resul
               <FormControl>
                 <Input placeholder="Enter patient name" {...field} />
               </FormControl>
-              <FormDescription>Please enter your name.</FormDescription>
+              <FormDescription>Not required</FormDescription>
               <FormMessage />
             </FormItem>
           )}
@@ -225,7 +206,7 @@ export function PredictionForm({ setResult, setResultData }: { setResult: (resul
               <FormControl>
                 <Slider
                   min={0}
-                  max={120}
+                  max={110}
                   step={1}
                   value={[field.value]}
                   onValueChange={([val]) => field.onChange(val)}
@@ -266,12 +247,6 @@ export function PredictionForm({ setResult, setResultData }: { setResult: (resul
                       Female
                     </FormLabel>
                   </FormItem>
-                  <FormItem className="flex items-center space-x-2">
-                    <RadioGroupItem value="Other" id="gender-other" />
-                    <FormLabel htmlFor="gender-other" className="font-normal">
-                      Other
-                    </FormLabel>
-                  </FormItem>
                 </RadioGroup>
               </FormControl>
               <FormMessage />
@@ -280,153 +255,167 @@ export function PredictionForm({ setResult, setResultData }: { setResult: (resul
         />
 
         {/* Hypertension */}
-        <FormField
-          control={form.control}
-          name="hypertension"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel className="text-md">Hypertension</FormLabel>
-              <FormControl>
-                <RadioGroup
-                  value={String(field.value)}
-                  onValueChange={(val) => field.onChange(Number(val))}
-                  className="flex flex-row gap-4"
-                >
-                  <FormItem className="flex items-center space-x-2">
-                    <RadioGroupItem value="1" id="hypertension-yes" />
-                    <FormLabel
-                      htmlFor="hypertension-yes"
-                      className="font-normal"
-                    >
-                      Yes
-                    </FormLabel>
-                  </FormItem>
-                  <FormItem className="flex items-center space-x-2">
-                    <RadioGroupItem value="0" id="hypertension-no" />
-                    <FormLabel
-                      htmlFor="hypertension-no"
-                      className="font-normal"
-                    >
-                      No
-                    </FormLabel>
-                  </FormItem>
-                </RadioGroup>
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        {/* Heart Disease */}
-        <FormField
-          control={form.control}
-          name="heartDisease"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel className="text-md">Heart Disease</FormLabel>
-              <FormControl>
-                <RadioGroup
-                  value={String(field.value)}
-                  onValueChange={(val) => field.onChange(Number(val))}
-                  className="flex flex-row gap-4"
-                >
-                  <FormItem className="flex items-center space-x-2">
-                    <RadioGroupItem value="1" id="heartDisease-yes" />
-                    <FormLabel
-                      htmlFor="heartDisease-yes"
-                      className="font-normal"
-                    >
-                      Yes
-                    </FormLabel>
-                  </FormItem>
-                  <FormItem className="flex items-center space-x-2">
-                    <RadioGroupItem value="0" id="heartDisease-no" />
-                    <FormLabel
-                      htmlFor="heartDisease-no"
-                      className="font-normal"
-                    >
-                      No
-                    </FormLabel>
-                  </FormItem>
-                </RadioGroup>
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="hypertension"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-md">Hypertension</FormLabel>
+                <FormControl>
+                  <RadioGroup
+                    value={String(field.value)}
+                    onValueChange={(val) => field.onChange(Number(val))}
+                    className="flex flex-row gap-4"
+                  >
+                    <FormItem className="flex items-center space-x-2">
+                      <RadioGroupItem value="1" id="hypertension-yes" />
+                      <FormLabel
+                        htmlFor="hypertension-yes"
+                        className="font-normal"
+                      >
+                        Yes
+                      </FormLabel>
+                    </FormItem>
+                    <FormItem className="flex items-center space-x-2">
+                      <RadioGroupItem value="0" id="hypertension-no" />
+                      <FormLabel
+                        htmlFor="hypertension-no"
+                        className="font-normal"
+                      >
+                        No
+                      </FormLabel>
+                    </FormItem>
+                  </RadioGroup>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          {/* Heart Disease */}
+          <FormField
+            control={form.control}
+            name="heartdisease"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-md">Heart Disease</FormLabel>
+                <FormControl>
+                  <RadioGroup
+                    value={String(field.value)}
+                    onValueChange={(val) => field.onChange(Number(val))}
+                    className="flex flex-row gap-4"
+                  >
+                    <FormItem className="flex items-center space-x-2">
+                      <RadioGroupItem value="1" id="heartdisease-yes" />
+                      <FormLabel
+                        htmlFor="heartdisease-yes"
+                        className="font-normal"
+                      >
+                        Yes
+                      </FormLabel>
+                    </FormItem>
+                    <FormItem className="flex items-center space-x-2">
+                      <RadioGroupItem value="0" id="heartdisease-no" />
+                      <FormLabel
+                        htmlFor="heartdisease-no"
+                        className="font-normal"
+                      >
+                        No
+                      </FormLabel>
+                    </FormItem>
+                  </RadioGroup>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
         {/* Marital Status */}
         <FormField
           control={form.control}
-          name="maritalStatus"
+          name="everMarried"
           render={({ field }) => (
             <FormItem>
-              <FormLabel className="text-md">Marital Status</FormLabel>
-              <Select value={field.value} onValueChange={field.onChange}>
-                <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select status" />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  <SelectItem value="Married">Married</SelectItem>
-                  <SelectItem value="Single">Single</SelectItem>
-                  <SelectItem value="Divorced">Divorced</SelectItem>
-                </SelectContent>
-              </Select>
+              <FormLabel className="text-md">Ever Married</FormLabel>
+              <FormControl>
+                <RadioGroup
+                  value={String(field.value)}
+                  onValueChange={(val) => field.onChange(Number(val))}
+                  className="flex flex-row gap-4"
+                >
+                  <FormItem className="flex items-center space-x-2">
+                    <RadioGroupItem value="1" id="everMarried-yes" />
+                    <FormLabel
+                      htmlFor="everMarried-yes"
+                      className="font-normal"
+                    >
+                      Yes
+                    </FormLabel>
+                  </FormItem>
+                  <FormItem className="flex items-center space-x-2">
+                    <RadioGroupItem value="0" id="everMarried-no" />
+                    <FormLabel htmlFor="everMarried-no" className="font-normal">
+                      No
+                    </FormLabel>
+                  </FormItem>
+                </RadioGroup>
+              </FormControl>
               <FormMessage />
             </FormItem>
           )}
         />
 
-        {/* Work Type */}
-        <FormField
-          control={form.control}
-          name="workType"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel className="text-md">Work Type</FormLabel>
-              <Select value={field.value} onValueChange={field.onChange}>
-                <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select work type" />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  <SelectItem value="Private">Private</SelectItem>
-                  <SelectItem value="Self-employed">Self-employed</SelectItem>
-                  <SelectItem value="Government Job">Government Job</SelectItem>
-                  <SelectItem value="Never Worked">Never Worked</SelectItem>
-                </SelectContent>
-              </Select>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* Work Type */}
+          <FormField
+            control={form.control}
+            name="workType"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-md">Work Type</FormLabel>
+                <Select value={field.value} onValueChange={field.onChange}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select work type" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="Private">Private</SelectItem>
+                    <SelectItem value="Self-employed">Self-employed</SelectItem>
+                    <SelectItem value="Government Job">
+                      Government Job
+                    </SelectItem>
+                    <SelectItem value="Children">Children</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
 
-        {/* Residence Type */}
-        <FormField
-          control={form.control}
-          name="residenceType"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel className="text-md">Residence Type</FormLabel>
-              <Select value={field.value} onValueChange={field.onChange}>
-                <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select residence type" />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  <SelectItem value="Urban">Urban</SelectItem>
-                  <SelectItem value="Rural">Rural</SelectItem>
-                </SelectContent>
-              </Select>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
+          {/* Residence Type */}
+          <FormField
+            control={form.control}
+            name="residenceType"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-md">Residence Type</FormLabel>
+                <Select value={field.value} onValueChange={field.onChange}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select residence type" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="Urban">Urban</SelectItem>
+                    <SelectItem value="Rural">Rural</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
         {/* Average Glucose Level */}
         <FormField
           control={form.control}
@@ -436,8 +425,8 @@ export function PredictionForm({ setResult, setResultData }: { setResult: (resul
               <FormLabel className="text-md">Average Glucose Level</FormLabel>
               <FormControl>
                 <Slider
-                  min={0}
-                  max={300}
+                  min={40}
+                  max={280}
                   step={1}
                   value={[field.value]}
                   onValueChange={([val]) => field.onChange(val)}
@@ -461,7 +450,7 @@ export function PredictionForm({ setResult, setResultData }: { setResult: (resul
               <FormLabel className="text-md">Body Mass Index (BMI)</FormLabel>
               <FormControl>
                 <Slider
-                  min={10}
+                  min={14}
                   max={50}
                   step={0.1}
                   value={[field.value]}
@@ -491,340 +480,14 @@ export function PredictionForm({ setResult, setResultData }: { setResult: (resul
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  <SelectItem value="Formerly Smoked">
-                    Formerly Smoked
+                  <SelectItem value="Formerly smoked">
+                    Formerly smoked
                   </SelectItem>
-                  <SelectItem value="Non-smoker">Non-smoker</SelectItem>
-                  <SelectItem value="Currently Smokes">
-                    Currently Smokes
-                  </SelectItem>
+                  <SelectItem value="Never smoked">Never Smoked</SelectItem>
+                  <SelectItem value="Smokes">Smokes</SelectItem>
+                  <SelectItem value="Unknown">Unknown</SelectItem>
                 </SelectContent>
               </Select>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        {/* Alcohol Intake */}
-        <FormField
-          control={form.control}
-          name="alcoholIntake"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel className="text-md">Alcohol Intake</FormLabel>
-              <Select value={field.value} onValueChange={field.onChange}>
-                <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select alcohol intake" />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  <SelectItem value="Never">Never</SelectItem>
-                  <SelectItem value="Rarely">Rarely</SelectItem>
-                  <SelectItem value="Social Drinker">Social Drinker</SelectItem>
-                  <SelectItem value="Frequent Drinker">
-                    Frequent Drinker
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        {/* Physical Activity */}
-        <FormField
-          control={form.control}
-          name="physicalActivity"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel className="text-md">Physical Activity</FormLabel>
-              <Select value={field.value} onValueChange={field.onChange}>
-                <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select activity level" />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  <SelectItem value="Low">Low</SelectItem>
-                  <SelectItem value="Moderate">Moderate</SelectItem>
-                  <SelectItem value="High">High</SelectItem>
-                </SelectContent>
-              </Select>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        {/* Stroke History */}
-        <FormField
-          control={form.control}
-          name="strokeHistory"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel className="text-md">Stroke History</FormLabel>
-              <FormControl>
-                <RadioGroup
-                  value={String(field.value)}
-                  onValueChange={(val) => field.onChange(Number(val))}
-                  className="flex flex-row gap-4"
-                >
-                  <FormItem className="flex items-center space-x-2">
-                    <RadioGroupItem value="1" id="strokeHistory-yes" />
-                    <FormLabel
-                      htmlFor="strokeHistory-yes"
-                      className="font-normal"
-                    >
-                      Yes
-                    </FormLabel>
-                  </FormItem>
-                  <FormItem className="flex items-center space-x-2">
-                    <RadioGroupItem value="0" id="strokeHistory-no" />
-                    <FormLabel
-                      htmlFor="strokeHistory-no"
-                      className="font-normal"
-                    >
-                      No
-                    </FormLabel>
-                  </FormItem>
-                </RadioGroup>
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        {/* Family History of Stroke */}
-        <FormField
-          control={form.control}
-          name="familyHistoryOfStroke"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel  className="text-md">Family History of Stroke</FormLabel>
-              <FormControl>
-                <RadioGroup
-                  value={String(field.value)}
-                  onValueChange={(val) => field.onChange(Number(val))}
-                  className="flex flex-row gap-4"
-                >
-                  <FormItem className="flex items-center space-x-2">
-                    <RadioGroupItem value="1" id="familyHistoryOfStroke-yes" />
-                    <FormLabel
-                      htmlFor="familyHistoryOfStroke-yes"
-                      className="font-normal"
-                    >
-                      Yes
-                    </FormLabel>
-                  </FormItem>
-                  <FormItem className="flex items-center space-x-2">
-                    <RadioGroupItem value="0" id="familyHistoryOfStroke-no" />
-                    <FormLabel
-                      htmlFor="familyHistoryOfStroke-no"
-                      className="font-normal"
-                    >
-                      No
-                    </FormLabel>
-                  </FormItem>
-                </RadioGroup>
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        {/* Dietary Habits */}
-        <FormField
-          control={form.control}
-          name="dietaryHabits"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel  className="text-md">Dietary Habits</FormLabel>
-              <Select value={field.value} onValueChange={field.onChange}>
-                <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select dietary habit" />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  <SelectItem value="Gluten-free">Gluten-free</SelectItem>
-                  <SelectItem value="Vegetarian">Vegetarian</SelectItem>
-                  <SelectItem value="Vegan">Vegan</SelectItem>
-                  <SelectItem value="Non-vegetarian">Non-vegetarian</SelectItem>
-                  <SelectItem value="Paleo">Paleo</SelectItem>
-                  <SelectItem value="Keto">Keto</SelectItem>
-                  <SelectItem value="Pescatarian">Pescatarian</SelectItem>
-                </SelectContent>
-              </Select>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        {/* Stress Levels */}
-        <FormField
-          control={form.control}
-          name="stressLevels"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel  className="text-md">Stress Levels (0-10)</FormLabel>
-              <FormControl>
-                <Slider
-                  min={0}
-                  max={10}
-                  step={1}
-                  value={[field.value]}
-                  onValueChange={([val]) => field.onChange(val)}
-                  className="w-full"
-                />
-              </FormControl>
-              <div className="text-sm text-muted-foreground mt-1">
-                Selected: {field.value}
-              </div>
-              <FormDescription>
-                Please rate your stress levels from 0 (no stress) to 10
-                (extremely stressed). You can refer to{" "}
-                <a
-                  className="text-blue-500 underline"
-                  href="https://www.das.nh.gov/wellness/docs/percieved%20stress%20scale.pdf"
-                >
-                  this
-                </a>
-              </FormDescription>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        {/* Blood Pressure Levels */}
-        <div>
-          <p className="my-4">Blood Pressure Levels (Systolic/Diastolic)</p>
-          <div className="flex gap-4">
-            <FormField
-              control={form.control}
-              name="bloodPressureLevels_systolic"
-              render={({ field }) => (
-                <FormItem className="flex-1">
-                  <FormLabel>Systolic BP</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      placeholder="Enter systolic BP"
-                      value={field.value}
-                      onChange={(e) => field.onChange(Number(e.target.value))}
-                      className="w-full"
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="bloodPressureLevels_diastolic"
-              render={({ field }) => (
-                <FormItem className="flex-1">
-                  <FormLabel>Diastolic BP</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      placeholder="Enter diastolic BP"
-                      value={field.value}
-                      onChange={(e) => field.onChange(Number(e.target.value))}
-                      className="w-full"
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </div>
-        </div>
-
-        <div>
-          <p className="my-4">Cholesterol Levels (HDL/LDL)</p>
-          <div className="flex gap-4">
-            <FormField
-              control={form.control}
-              name="cholesterolLevels_HDL"
-              render={({ field }) => (
-                <FormItem className="flex-1">
-                  <FormLabel>HDL Cholesterol</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      placeholder="Enter HDL cholesterol"
-                      value={field.value}
-                      onChange={(e) => field.onChange(Number(e.target.value))}
-                      className="w-full"
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="cholesterolLevels_LDL"
-              render={({ field }) => (
-                <FormItem className="flex-1">
-                  <FormLabel>LDL Cholesterol</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      placeholder="Enter LDL cholesterol"
-                      value={field.value}
-                      onChange={(e) => field.onChange(Number(e.target.value))}
-                      className="w-full"
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </div>
-        </div>
-
-        {/* Symptoms */}
-        <FormField
-          control={form.control}
-          name="symptoms"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel className="text-md">Symptoms</FormLabel>
-              <FormDescription>
-                Please select <b>all</b> applicable symptoms.
-              </FormDescription>
-
-              <FormControl>
-                <div className="grid grid-cols-2 gap-2">
-                  {symptomOptions.map((symptom) => (
-                    <label key={symptom} className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        value={symptom}
-                        checked={field.value?.includes(symptom)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            field.onChange([
-                              ...field.value,
-                              symptom as (typeof symptomOptions)[number],
-                            ]);
-                          } else {
-                            field.onChange(
-                              field.value.filter(
-                                (s: (typeof symptomOptions)[number]) =>
-                                  s !== symptom
-                              )
-                            );
-                          }
-                        }}
-                        className="checkbox"
-                      />
-                      <span>{symptom}</span>
-                    </label>
-                  ))}
-                </div>
-              </FormControl>
               <FormMessage />
             </FormItem>
           )}
